@@ -1,57 +1,127 @@
-# ebpf-networking
+# eBPF Networking
+
+A Rust-based eBPF networking project using the Aya framework for kernel-space and user-space networking applications.
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Build Instructions](#build-instructions)
+- [Running the Application](#running-the-application)
+- [Cross-compiling](#cross-compiling)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Prerequisites
 
-1. stable rust toolchains: `rustup toolchain install stable`
-1. nightly rust toolchains: `rustup toolchain install nightly --component rust-src`
-1. (if cross-compiling) rustup target: `rustup target add ${ARCH}-unknown-linux-musl`
-1. (if cross-compiling) LLVM: (e.g.) `brew install llvm` (on macOS)
-1. (if cross-compiling) C toolchain: (e.g.) [`brew install filosottile/musl-cross/musl-cross`](https://github.com/FiloSottile/homebrew-musl-cross) (on macOS)
-1. bpf-linker: `cargo install bpf-linker` (`--no-default-features` on macOS)
+### Required Tools
 
-## Build & Run
+1. **Rust Toolchains**:
+   - Stable: `rustup toolchain install stable`
+   - Nightly: `rustup toolchain install nightly --component rust-src`
 
-Use `cargo build`, `cargo check`, etc. as normal. Run your program with:
+2. **eBPF Dependencies**:
+   - bpf-linker: `cargo install bpf-linker` (use `--no-default-features` on macOS)
+   - For eBPF target: `rustup target add bpfel-unknown-none`
 
-```shell
-cargo run --release --config 'target."cfg(all())".runner="sudo -E"'
+3. **Cross-compilation Dependencies** (if needed):
+   - Target architecture: `rustup target add ${ARCH}-unknown-linux-musl`
+   - LLVM: `brew install llvm` (macOS) or equivalent for your OS
+   - C toolchain: [`brew install filosottile/musl-cross/musl-cross`](https://github.com/FiloSottile/homebrew-musl-cross) (macOS)
+
+### System Requirements
+
+- Linux system with eBPF support (kernel version 4.1+)
+- Root privileges for loading eBPF programs
+- Network interface for testing
+
+## Project Structure
+
+```
+ebpf-networking/
+├── ebpf-networking-ebpf/    # Kernel-space eBPF code
+├── src/                     # User-space Rust code
+├── Cargo.toml              # User-space dependencies
+├── README.md               # This file
+└── LICENSE-*               # License files
 ```
 
-Cargo build scripts are used to automatically build the eBPF correctly and include it in the
-program.
+## Installation
 
-## Cross-compiling on macOS
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd ebpf-networking
+   ```
 
-Cross compilation should work on both Intel and Apple Silicon Macs.
+2. **Install dependencies**:
+   ```bash
+   # Install Rust toolchains
+   rustup toolchain install stable
+   rustup toolchain install nightly --component rust-src
+   
+   # Add eBPF target
+   rustup target add bpfel-unknown-none
+   
+   # Install bpf-linker
+   cargo install bpf-linker
+   ```
 
-```shell
-CC=${ARCH}-linux-musl-gcc cargo build --package ebpf-networking --release \
-  --target=${ARCH}-unknown-linux-musl \
-  --config=target.${ARCH}-unknown-linux-musl.linker=\"${ARCH}-linux-musl-gcc\"
+## Build Instructions
+
+### Building eBPF Kernel Code
+
+Navigate to the eBPF directory and build:
+
+```bash
+cd ebpf-networking-ebpf
+cargo +nightly build --release --target=bpfel-unknown-none -Z build-std=core
 ```
-The cross-compiled program `target/${ARCH}-unknown-linux-musl/release/ebpf-networking` can be
-copied to a Linux server or VM and run there.
 
-## License
+### Building User-space Code
 
-With the exception of eBPF code, ebpf-networking is distributed under the terms
-of either the [MIT license] or the [Apache License] (version 2.0), at your
-option.
+From the project root:
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
-be dual licensed as above, without any additional terms or conditions.
+```bash
+cargo build --release
+```
 
-### eBPF
+### Complete Build Process
 
-All eBPF code is distributed under either the terms of the
-[GNU General Public License, Version 2] or the [MIT license], at your
-option.
+To build both components in one step, use the automated build script from the project root:
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in this project by you, as defined in the GPL-2 license, shall be
-dual licensed as above, without any additional terms or conditions.
+```bash
+# Build both kernel and user-space components
+cargo build --release
+```
 
-[Apache license]: LICENSE-APACHE
-[MIT license]: LICENSE-MIT
-[GNU General Public License, Version 2]: LICENSE-GPL2
+*Note: Cargo build scripts automatically handle the eBPF compilation and inclusion.*
+
+## Running the Application
+
+### Basic Usage
+
+```bash
+sudo RUST_LOG=info ./target/release/ebpf-networking --iface <interface_name>
+```
+
+### Example
+
+```bash
+sudo RUST_LOG=info ./target/release/ebpf-networking --iface enp0s3
+```
+
+### Alternative Run Command
+
+You can also use cargo run with elevated privileges:
+
+```bash
+cargo run --release --config 'target."cfg(all())".runner="sudo -E"' -- --iface enp0s3
+```
+
+### Environment Variables
+
+- `RUST_LOG`: Set logging level (e.g., `debug`, `info`, `warn`, `error`)
+- `INTERFACE`: Network interface name (can also be passed as `--iface` argument)
